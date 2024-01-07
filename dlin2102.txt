@@ -2,4 +2,88 @@ Make an haiku
 to give to you dude?
 No clue how to do
 
-By Dan Lin
+import React, { useState } from 'react';
+
+const DynamicForm = () => {
+  const [formFields, setFormFields] = useState([
+    { id: 1, type: 'SingleContextSingleInput', values: {} },
+  ]);
+
+  const handleChange = (index, field, value) => {
+    const updatedFields = [...formFields];
+    updatedFields[index].values[field] = value;
+    setFormFields(updatedFields);
+  };
+
+  const handleAddField = (type) => {
+    const newField = {
+      id: formFields.length + 1,
+      type,
+      values: {},
+    };
+    setFormFields([...formFields, newField]);
+  };
+
+  const handleDeleteField = (index) => {
+    const updatedFields = formFields.filter((field, i) => i !== index);
+    setFormFields(updatedFields);
+  };
+
+  const renderFieldSet = (field) => {
+    switch (field.type) {
+      case 'SingleContextSingleInput':
+        return (
+          <div key={field.id}>
+            <select
+              value={field.values.selectField1}
+              onChange={(e) => handleChange(field.id - 1, 'selectField1', e.target.value)}
+            >
+              <option value="option1">Option 1</option>
+              <option value="option2">Option 2</option>
+            </select>
+            <select
+              value={field.values.selectField2}
+              onChange={(e) => handleChange(field.id - 1, 'selectField2', e.target.value)}
+            >
+              <option value="optionA">Option A</option>
+              <option value="optionB">Option B</option>
+            </select>
+            <select
+              value={field.values.selectField3}
+              onChange={(e) => handleChange(field.id - 1, 'selectField3', e.target.value)}
+            >
+              <option value="choiceX">Choice X</option>
+              <option value="choiceY">Choice Y</option>
+            </select>
+            <textarea
+              placeholder="Text Area 1"
+              value={field.values.textArea1}
+              onChange={(e) => handleChange(field.id - 1, 'textArea1', e.target.value)}
+            />
+            <textarea
+              placeholder="Text Area 2"
+              value={field.values.textArea2}
+              onChange={(e) => handleChange(field.id - 1, 'textArea2', e.target.value)}
+            />
+            <button onClick={() => handleDeleteField(field.id - 1)}>Delete</button>
+          </div>
+        );
+      // Add more cases for additional field sets
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div>
+      {formFields.map((field) => renderFieldSet(field))}
+      <button onClick={() => handleAddField('SingleContextSingleInput')}>Add SingleContextSingleInput</button>
+      {/* Add more buttons for additional field set types */}
+    </div>
+  );
+};
+
+export default DynamicForm;
+
+
