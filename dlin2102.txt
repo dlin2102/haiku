@@ -1,5 +1,51 @@
 Make an haiku
 to give to you dude?
 No clue how to do
+import React from 'react';
+import { shallow } from 'enzyme';
+import DynamicForm from './DynamicForm';
 
+describe('DynamicForm Component', () => {
+  it('should render the component without crashing', () => {
+    const wrapper = shallow(<DynamicForm setAnnotationReqs={() => {}} />);
+    expect(wrapper.exists()).toBe(true);
+  });
+
+  it('should add a SingleContextSingleInput field set when the "Add SingleContextSingleInput" button is clicked', () => {
+    const setAnnotationReqsMock = jest.fn();
+    const wrapper = shallow(<DynamicForm setAnnotationReqs={setAnnotationReqsMock} />);
+    
+    // Initially, there should be only one field set
+    expect(wrapper.find('div').length).toBe(1);
+
+    // Simulate button click to add a new SingleContextSingleInput field set
+    wrapper.find('button').simulate('click');
+
+    // Now, there should be two field sets
+    expect(wrapper.find('div').length).toBe(2);
+
+    // Ensure that setAnnotationReqs is called with the updated form fields
+    expect(setAnnotationReqsMock).toHaveBeenCalledWith([
+      { id: 1, type: 'SingleContextSingleInput', values: {} },
+      { id: 2, type: 'SingleContextSingleInput', values: {} },
+    ]);
+  });
+
+  it('should delete a field set when the "Delete" button is clicked', () => {
+    const setAnnotationReqsMock = jest.fn();
+    const wrapper = shallow(<DynamicForm setAnnotationReqs={setAnnotationReqsMock} />);
+    
+    // Initially, there should be only one field set
+    expect(wrapper.find('div').length).toBe(1);
+
+    // Simulate button click to delete the SingleContextSingleInput field set
+    wrapper.find('button').simulate('click');
+
+    // Now, there should be no field sets
+    expect(wrapper.find('div').length).toBe(0);
+
+    // Ensure that setAnnotationReqs is called with an empty array
+    expect(setAnnotationReqsMock).toHaveBeenCalledWith([]);
+  });
+});
 
