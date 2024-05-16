@@ -1,51 +1,34 @@
 Make an haiku
 to give to you dude?
 No clue how to do
-import React from 'react';
-import { shallow } from 'enzyme';
-import DynamicForm from './DynamicForm';
+import React, { useState } from 'react';
 
-describe('DynamicForm Component', () => {
-  it('should render the component without crashing', () => {
-    const wrapper = shallow(<DynamicForm setAnnotationReqs={() => {}} />);
-    expect(wrapper.exists()).toBe(true);
-  });
+const Terminal = () => {
+  const [responses, setResponses] = useState([]);
 
-  it('should add a SingleContextSingleInput field set when the "Add SingleContextSingleInput" button is clicked', () => {
-    const setAnnotationReqsMock = jest.fn();
-    const wrapper = shallow(<DynamicForm setAnnotationReqs={setAnnotationReqsMock} />);
-    
-    // Initially, there should be only one field set
-    expect(wrapper.find('div').length).toBe(1);
+  // Function to handle API response
+  const handleApiResponse = (response) => {
+    setResponses(prevResponses => [...prevResponses, response]);
+  };
 
-    // Simulate button click to add a new SingleContextSingleInput field set
-    wrapper.find('button').simulate('click');
+  // Simulated API call function
+  const callApi = () => {
+    // Simulated API response
+    const response = 'This is a sample API response.';
+    handleApiResponse(response);
+  };
 
-    // Now, there should be two field sets
-    expect(wrapper.find('div').length).toBe(2);
+  return (
+    <div className="terminal-window">
+      <div className="terminal-output">
+        {responses.map((response, index) => (
+          <div key={index}>{response}</div>
+        ))}
+      </div>
+      <button onClick={callApi}>Call API</button>
+    </div>
+  );
+};
 
-    // Ensure that setAnnotationReqs is called with the updated form fields
-    expect(setAnnotationReqsMock).toHaveBeenCalledWith([
-      { id: 1, type: 'SingleContextSingleInput', values: {} },
-      { id: 2, type: 'SingleContextSingleInput', values: {} },
-    ]);
-  });
-
-  it('should delete a field set when the "Delete" button is clicked', () => {
-    const setAnnotationReqsMock = jest.fn();
-    const wrapper = shallow(<DynamicForm setAnnotationReqs={setAnnotationReqsMock} />);
-    
-    // Initially, there should be only one field set
-    expect(wrapper.find('div').length).toBe(1);
-
-    // Simulate button click to delete the SingleContextSingleInput field set
-    wrapper.find('button').simulate('click');
-
-    // Now, there should be no field sets
-    expect(wrapper.find('div').length).toBe(0);
-
-    // Ensure that setAnnotationReqs is called with an empty array
-    expect(setAnnotationReqsMock).toHaveBeenCalledWith([]);
-  });
-});
+export default Terminal;
 
