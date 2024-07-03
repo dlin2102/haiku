@@ -1,34 +1,161 @@
-Make an haiku
-to give to you dude?
-No clue how to do
-import React, { useState } from 'react';
+Sure! Here are detailed step-by-step directions to set up the automation for deleting S3 buckets and IAM roles that meet a specific naming convention.
 
-const Terminal = () => {
-  const [responses, setResponses] = useState([]);
+### Step 1: Create an IAM Role with Necessary Permissions
 
-  // Function to handle API response
-  const handleApiResponse = (response) => {
-    setResponses(prevResponses => [...prevResponses, response]);
-  };
+1. **Go to the IAM Console:**
+   - Open the [IAM Management Console](https://console.aws.amazon.com/iam/).
 
-  // Simulated API call function
-  const callApi = () => {
-    // Simulated API response
-    const response = 'This is a sample API response.';
-    handleApiResponse(response);
-  };
+2. **Create a New Role:**
+   - Click on "Roles" in the left navigation pane.
+   - Click the "Create role" button.
 
-  return (
-    <div className="terminal-window">
-      <div className="terminal-output">
-        {responses.map((response, index) => (
-          <div key={index}>{response}</div>
-        ))}
-      </div>
-      <button onClick={callApi}>Call API</button>
-    </div>
-  );
-};
+3. **Select a Trusted Entity:**
+   - Choose "AWS service" and then select "Systems Manager" as the service that will use this role.
+   - Click "Next: Permissions."
 
-export default Terminal;
+4. **Attach Permissions Policies:**
+   - Attach the following policies to the role to allow it to perform the required actions:
+     - `AmazonS3FullAccess`
+     - `IAMFullAccess`
+   - Click "Next: Tags" and add any tags if needed.
+   - Click "Next: Review."
+
+5. **Name the Role:**
+   - Enter a role name (e.g., `SSM_Automation_Role`) and description.
+   - Click "Create role."
+
+### Step 2: Create the SSM Automation Document
+
+1. **Go to the Systems Manager Console:**
+   - Open the [AWS Systems Manager Console](https://console.aws.amazon.com/systems-manager/).
+
+2. **Create a New Automation Document:**
+   - In the left navigation pane, under "Actions & Change," choose "Documents."
+   - Click the "Create document" button.
+   - Select "Automation" as the document type.
+
+3. **Define the Document Content:**
+   - Copy and paste the following YAML content into the document editor:
+
+```yaml
+description: "Delete S3 buckets and IAM roles that match a naming convention"
+schemaVersion: "0.3"
+assumeRole: "{{ AutomationAssumeRole }}"
+parameters:
+  AutomationAssumeRole:
+    type: String
+    description: "(Optional) The ARN of the role that allows Automation to perform the actions on your behalf."
+  S3BucketPrefix:
+    type: String
+    description: "(Required) The prefix for the S3 bucket names to delete."
+  IAMRolePrefix:
+    type: String
+    description: "(Required) The prefix for the IAM role names to delete."
+  RetentionDays:
+    type: Integer
+    description: "(Required) Number of days to retain objects in the S3 bucket before deletion."
+
+mainSteps:
+- name: deleteOldS3Buckets
+  action: aws:executeScript
+  inputs:
+    Runtime: python3.8
+    Handler: delete_old_s3_buckets
+    Script: |
+      import boto3
+      from datetime import datetime, timedelta
+
+      def delete_old_s3_buckets(event, context):
+          s3 = boto3.client('s3')
+          retention_days = event['RetentionDays']
+          bucket_prefix = event['S3BucketPrefix']
+          delete_threshold = datetime.utcnow() - timedelta(days=retention_days)
+
+          try:
+              response = s3.list_buckets()
+              for bucket in response['Buckets']:
+                  bucket_name = bucket['Name']
+                  if bucket_name.startswith(bucket_prefix):
+                      objects_response = s3.list_objects_v2(Bucket=bucket_name)
+                      if 'Contents' in objects_response:
+                          for obj in objects_response['Contents']:
+                              if obj['LastModified'].replace(tzinfo=None) < delete_threshold:
+                                  s3.delete_object(Bucket=bucket_name, Key=obj['Key'])
+                      s3.delete_bucket(Bucket=bucket_name)
+              return {"status": "S3 buckets with prefix '{}' deleted".format(bucket_prefix)}
+          except Exception as e:
+              return {"status": "Error", "error": str(e)}
+
+- name: deleteIAMRoles
+  action: aws:executeScript
+  inputs:
+    Runtime: python3.8
+    Handler: delete_iam_roles
+    Script: |
+      import boto3
+
+      def delete_iam_roles(event, context):
+          iam = boto3.client('iam')
+          role_prefix = event['IAMRolePrefix']
+
+          try:
+              response = iam.list_roles()
+              for role in response['Roles']:
+                  role_name = role['RoleName']
+                  if role_name.startswith(role_prefix):
+                      attached_policies = iam.list_attached_role_policies(RoleName=role_name)['AttachedPolicies']
+                      for policy in attached_policies:
+                          iam.detach_role_policy(RoleName=role_name, PolicyArn=policy['PolicyArn'])
+                      iam.delete_role(RoleName=role_name)
+              return {"status": "IAM roles with prefix '{}' deleted".format(role_prefix)}
+          except Exception as e:
+              return {"status": "Error", "error": str(e)}
+```
+
+4. **Save the Document:**
+   - Name your document (e.g., `DeleteOldS3BucketsAndIAMRoles`).
+   - Optionally, add a description.
+   - Click "Create document."
+
+### Step 3: Schedule the Automation Document Using CloudWatch Events
+
+1. **Go to the CloudWatch Console:**
+   - Open the [CloudWatch Management Console](https://console.aws.amazon.com/cloudwatch/).
+
+2. **Create a New Rule:**
+   - In the left navigation pane, under "Events," choose "Rules."
+   - Click the "Create rule" button.
+
+3. **Define the Event Source:**
+   - For "Event Source," select "Event Source" and then "Schedule."
+   - Define the schedule (e.g., `rate(1 day)` for daily execution).
+
+4. **Add the Target:**
+   - For "Target," choose "Systems Manager Automation."
+   - Configure the target details:
+     - Document: `DeleteOldS3BucketsAndIAMRoles`
+     - Input parameters: Provide the required parameters such as `S3BucketPrefix`, `IAMRolePrefix`, `RetentionDays`, and `AutomationAssumeRole` (use the ARN of the role created in Step 1).
+
+5. **Create the Rule:**
+   - Review the settings.
+   - Click "Create rule."
+
+### Step 4: Monitor and Verify the Automation
+
+1. **Go to the Systems Manager Console:**
+   - Open the [AWS Systems Manager Console](https://console.aws.amazon.com/systems-manager/).
+
+2. **Monitor Automation Executions:**
+   - In the left navigation pane, under "Automation," choose "Executions."
+   - Check the status of the automation executions to ensure they are running as expected.
+
+3. **Review Logs and Outputs:**
+   - Click on the individual execution IDs to review the details, logs, and outputs to verify the automation is performing the intended actions.
+
+### Final Notes:
+- **Permissions:** Ensure the IAM role has the necessary permissions (`s3:ListBucket`, `s3:DeleteObject`, `s3:DeleteBucket`, `iam:ListRoles`, `iam:ListAttachedRolePolicies`, `iam:DetachRolePolicy`, and `iam:DeleteRole`).
+- **Testing:** Thoroughly test the automation in a non-production environment to confirm it works as expected before deploying it in production.
+- **Naming Conventions:** Ensure your S3 buckets and IAM roles follow the specified naming conventions for this automation to work correctly.
+
+Feel free to ask if you have any questions or need further assistance!
 
